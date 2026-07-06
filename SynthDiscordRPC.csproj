@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>SynthDiscordRPC</AssemblyName>
+    <RootNamespace>SynthDiscordRPC</RootNamespace>
+    <Version>1.1.0</Version>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+
+    <!-- Edit this to your Synth Riders install path -->
+    <GamePath>F:\SteamLibrary\steamapps\common\SynthRiders</GamePath>
+  </PropertyGroup>
+
+  <!--
+    Deliberately references ONLY MelonLoader's bundled assemblies.
+    No UnityEngine, no Il2Cpp game assemblies -> the same DLL loads on
+    both the Unity 2021.3.45f2 branch and the Unity 6000.3.13 branch.
+    All game access is done via reflection at runtime (AccessTools.TypeByName).
+  -->
+  <ItemGroup>
+    <Reference Include="MelonLoader">
+      <HintPath>$(GamePath)\MelonLoader\net6\MelonLoader.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GamePath)\MelonLoader\net6\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
