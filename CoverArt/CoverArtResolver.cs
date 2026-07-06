@@ -42,6 +42,14 @@ namespace SynthDiscordRPC.CoverArt
         private static readonly string[] CoverFieldCandidates =
             { "cover_url", "cover", "image_url", "image", "artwork_url", "albumArt", "art_url" };
 
+        // iTunes Search API — keyless, ~20 calls/min (our disk cache means one call
+        // per song ever). OST tracks are licensed commercial music, so coverage is
+        // near-total there; also catches customs of licensed songs synthriderz missed.
+        private const string ITunesSearchTemplate =
+            "https://itunes.apple.com/search?media=music&entity=song&limit=5&term={term}";
+
+        private readonly bool _iTunesEnabled;
+
         private readonly HttpClient _http;
         private readonly string _cacheFile;
         private readonly Dictionary<string, string> _cache; // key -> url ("" = known miss)
@@ -49,9 +57,10 @@ namespace SynthDiscordRPC.CoverArt
         private readonly bool _debug;
         private bool _keysDumped;
 
-        public CoverArtResolver(bool debug)
+        public CoverArtResolver(bool debug, bool iTunesEnabled)
         {
             _debug = debug;
+            _iTunesEnabled = iTunesEnabled;
             _http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
             _http.DefaultRequestHeaders.UserAgent.ParseAdd("SynthDiscordRPC/1.1 (+MelonLoader mod)");
 
@@ -96,11 +105,27 @@ namespace SynthDiscordRPC.CoverArt
                 string url = null;
                 try
                 {
-                    url = await QueryApi(title, artist).ConfigureAwait(false);
+                    url = await QuerySynthriderz(title, artist).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    if (_debug) MelonLogger.Warning($"[CoverArt] Lookup failed for '{title}': {ex.Message}");
+                    if (_debug) MelonLogger.Warning($"[CoverArt] synthriderz lookup failed for '{title}': {ex.Message}");
+                }
+
+                // OST songs (and licensed customs synthriderz missed) — licensed
+                // commercial music, so the iTunes catalog usually has the art.
+                // Skipped when the game gave us no artist: matching on title alone
+                // risks showing the wrong song's art, and no image beats wrong image.
+                if (url == null && _iTunesEnabled && !string.IsNullOrWhiteSpace(artist))
+                {
+                    try
+                    {
+                        url = await QueryITunes(title, artist).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (_debug) MelonLogger.Warning($"[CoverArt] iTunes lookup failed for '{title}': {ex.Message}");
+                    }
                 }
 
                 lock (_cacheLock)
@@ -114,7 +139,7 @@ namespace SynthDiscordRPC.CoverArt
             });
         }
 
-        private async Task<string> QueryApi(string title, string artist)
+        private async Task<string> QuerySynthriderz(string title, string artist)
         {
             string requestUrl = SearchUrlTemplate
                 .Replace("{title}", Uri.EscapeDataString(title.Trim()))
@@ -143,6 +168,61 @@ namespace SynthDiscordRPC.CoverArt
                 }
             }
             return null;
+        }
+
+        /// <summary>
+        /// iTunes Search API lookup. Response shape: {"resultCount":N,"results":[...]}
+        /// with "artworkUrl100" and "artistName" per result. We take the first result
+        /// whose artist actually matches ours, and upscale the artwork URL
+        /// (100x100 -> 512x512; Apple serves arbitrary sizes on the same path).
+        /// </summary>
+        private async Task<string> QueryITunes(string title, string artist)
+        {
+            string term = Uri.EscapeDataString($"{artist.Trim()} {title.Trim()}");
+            string requestUrl = ITunesSearchTemplate.Replace("{term}", term);
+
+            string body = await _http.GetStringAsync(requestUrl).ConfigureAwait(false);
+
+            using var doc = JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("results", out var results) ||
+                results.ValueKind != JsonValueKind.Array)
+                return null;
+
+            string wantArtist = NormalizeForMatch(artist);
+
+            foreach (var item in results.EnumerateArray())
+            {
+                if (!item.TryGetProperty("artistName", out var artistEl) ||
+                    artistEl.ValueKind != JsonValueKind.String)
+                    continue;
+
+                // Guard against fuzzy-match serving the wrong song's art:
+                // require artist-name overlap. No image beats wrong image.
+                string gotArtist = NormalizeForMatch(artistEl.GetString());
+                if (gotArtist.Length == 0 || wantArtist.Length == 0) continue;
+                if (!gotArtist.Contains(wantArtist) && !wantArtist.Contains(gotArtist)) continue;
+
+                if (item.TryGetProperty("artworkUrl100", out var artEl) &&
+                    artEl.ValueKind == JsonValueKind.String)
+                {
+                    string url = artEl.GetString();
+                    if (string.IsNullOrWhiteSpace(url)) continue;
+                    url = url.Replace("100x100", "512x512");
+                    if (url.Length <= 256) return url;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>Lowercase, alphanumerics only — tolerant artist comparison.</summary>
+        private static string NormalizeForMatch(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var sb = new System.Text.StringBuilder(s.Length);
+            foreach (char c in s)
+                if (char.IsLetterOrDigit(c))
+                    sb.Append(char.ToLowerInvariant(c));
+            return sb.ToString();
         }
 
         /// <summary>Handle both response shapes: a raw JSON array, or {"data":[...]}.</summary>

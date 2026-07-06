@@ -50,7 +50,8 @@ own application.
 | `MenuStateText` | `Browsing songs` | Second line while not in a song. |
 | `LargeImageKey` | `logo` | Art asset key (or https URL). Empty = no image. |
 | `LargeImageText` | `Synth Riders` | Hover text on the image. |
-| `AlbumArt` | `true` | Show custom-song cover art from synthriderz.com as the presence image (logo moves to the small corner overlay). OST songs fall back to the logo. |
+| `AlbumArt` | `true` | Show song cover art as the presence image (logo moves to the small corner overlay). |
+| `ITunesFallback` | `true` | When synthriderz has no cover (OST songs), look up the art in the iTunes catalog with an artist-match guard. |
 | `DebugLogging` | `false` | Verbose logs + one-time `Game_InfoProvider` and synthriderz-API member dumps. |
 
 ## Album art (custom songs)
@@ -59,7 +60,12 @@ Discord cannot display local images, and custom-song covers live inside local `.
 files — so the mod looks the song up on **synthriderz.com** (title + artist) and uses the
 hosted cover URL as the presence image. Results (including misses) are cached in
 `UserData/SynthDiscordRPC/covercache.json`, so each song costs at most one query ever.
-OST songs aren't on synthriderz and cleanly fall back to the logo. Lookups run on a
+
+**Official (OST/DLC) songs** aren't on synthriderz, but they're licensed commercial
+music — so when synthriderz misses, the mod falls back to the keyless **iTunes Search
+API** (title + artist) and uses the 512x512 store artwork. A guard only accepts results
+whose artist name actually matches, so a fuzzy match can never show the wrong song's
+art — anything unmatched keeps the logo. Disable via `ITunesFallback = false`. Lookups run on a
 background thread; the presence appears instantly with the logo and upgrades to cover
 art about a second later.
 

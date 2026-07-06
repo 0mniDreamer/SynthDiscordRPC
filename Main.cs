@@ -4,7 +4,7 @@ using MelonLoader;
 using SynthDiscordRPC.Discord;
 using SynthDiscordRPC.Game;
 
-[assembly: MelonInfo(typeof(SynthDiscordRPC.Main), "SynthDiscordRPC", "1.1.0", "OmniDreamer")]
+[assembly: MelonInfo(typeof(SynthDiscordRPC.Main), "SynthDiscordRPC", "1.2.0", "OmniDreamer")]
 [assembly: MelonGame(null, null)] // universal — loads on both Unity branches
 
 namespace SynthDiscordRPC
@@ -16,12 +16,6 @@ namespace SynthDiscordRPC
     /// </summary>
     public class Main : MelonMod
     {
-        /// <summary>
-        /// Distribution default: create ONE Discord application (named "Synth Riders")
-        /// on https://discord.com/developers/applications and paste its Application ID
-        /// here before building a release. Application IDs are public — safe to embed.
-        /// Users can still override via the ClientId config entry.
-        /// </summary>
         private const string DefaultClientId = "1523758767240642680";
 
         private MelonPreferences_Category _cfg;
@@ -33,6 +27,7 @@ namespace SynthDiscordRPC
         private MelonPreferences_Entry<string> _largeImageText;
         private MelonPreferences_Entry<bool> _debugLogging;
         private MelonPreferences_Entry<bool> _albumArt;
+        private MelonPreferences_Entry<bool> _iTunesArt;
 
         private DiscordIpcClient _client;
         private CoverArt.CoverArtResolver _coverArt;
@@ -62,7 +57,9 @@ namespace SynthDiscordRPC
             _debugLogging = _cfg.CreateEntry("DebugLogging", false,
                 description: "Verbose logging incl. one-time Game_InfoProvider and synthriderz-API member dumps.");
             _albumArt = _cfg.CreateEntry("AlbumArt", true,
-                description: "Look up custom-song cover art on synthriderz.com and show it as the presence image (logo moves to the corner). OST songs fall back to the logo.");
+                description: "Look up custom-song cover art on synthriderz.com and show it as the presence image (logo moves to the corner). OST songs fall back to iTunes/logo.");
+            _iTunesArt = _cfg.CreateEntry("ITunesFallback", true,
+                description: "When synthriderz has no cover (OST songs), look the song up in the iTunes catalog. Only accepts results whose artist matches, to avoid wrong art.");
 
             GameHooks.Configure(_debugLogging.Value);
 
@@ -87,7 +84,7 @@ namespace SynthDiscordRPC
             _client.Start();
 
             if (_albumArt.Value)
-                _coverArt = new CoverArt.CoverArtResolver(_debugLogging.Value);
+                _coverArt = new CoverArt.CoverArtResolver(_debugLogging.Value, _iTunesArt.Value);
 
             GameHooks.SongStarted += OnSongStarted;
             GameHooks.SongEnded += OnSongEnded;
