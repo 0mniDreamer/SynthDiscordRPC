@@ -52,6 +52,9 @@ own application.
 | `LargeImageText` | `Synth Riders` | Hover text on the image. |
 | `AlbumArt` | `true` | Show song cover art as the presence image (logo moves to the small corner overlay). |
 | `ITunesFallback` | `true` | When synthriderz has no cover (OST songs), look up the art in the iTunes catalog with an artist-match guard. |
+| `TimeRemaining` | `true` | Live countdown of the song's remaining time. |
+| `LiveScore` | `true` | Append live score and combo to the presence, updated periodically. |
+| `LiveScoreIntervalSeconds` | `20` | Seconds between score updates (clamped to 15+ for Discord's rate limit). |
 | `DebugLogging` | `false` | Verbose logs + one-time `Game_InfoProvider` and synthriderz-API member dumps. |
 
 ## Album art (custom songs)
@@ -74,6 +77,22 @@ appearing after a site update, enable `DebugLogging` — the log prints the real
 of the first API item (`[CoverArt] beatmap item keys: ...`) to update the candidate list
 from. You can inspect the API yourself with:
 `curl "https://synthriderz.com/api/beatmaps?limit=1"`
+
+## Live score & time remaining
+
+With a song's duration read from the game, the presence carries an **end timestamp** and
+Discord renders a live countdown client-side — zero update cost. Every score update also
+**resyncs** the countdown from the actual play position when readable, so pausing (which
+stops the song but not Discord's clock) self-corrects within one interval.
+
+**Live score** polls `Game_ScoreManager` (the same pattern the websocket mod uses) every
+`LiveScoreIntervalSeconds` and re-sends the presence only when the score changed, shown as
+`by Artist [Master] • 45,230 pts • 87x`. Rate budget: 2 writes at song start (presence +
+cover art), then at most one per interval — inside the 4-per-20s window.
+
+If score or duration reads fail on a branch, those features silently degrade (elapsed
+timer instead of countdown, no score suffix) — enable `DebugLogging` for a one-time
+`Game_ScoreManager` member dump to correct the candidate names.
 
 ## Behaviour notes
 

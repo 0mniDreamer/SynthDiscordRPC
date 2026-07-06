@@ -60,6 +60,7 @@ namespace SynthDiscordRPC.Game
             { "s_instance", "Instance", "_instance", "instance" };
 
         private static Type _infoProviderType;
+        private static Type _gcmType;
         private static bool _debug;
         private static bool _membersDumped;
 
@@ -82,6 +83,7 @@ namespace SynthDiscordRPC.Game
         {
             Type gcm = ResolveType(GcmTypeNames);
             if (gcm == null) return false;
+            _gcmType = gcm;
 
             _infoProviderType = ResolveType(InfoProviderTypeNames);
             if (_infoProviderType == null)
@@ -257,6 +259,185 @@ namespace SynthDiscordRPC.Game
                 if (_debug) MelonLogger.Warning($"[GameHooks] ReadSongInfo: {ex.Message}");
                 return null;
             }
+        }
+
+        // ------------------------------------------------------------------
+        // Live stats (score / combo / duration / play time)
+        // ------------------------------------------------------------------
+
+        // Verified in SynthRidersWebsocketMod: Game_ScoreManager.s_instance with
+        // Score / CurrentCombo (polling from OnUpdate is the proven pattern; the
+        // LevelUp-era dump also showed 'currentScore' casing, so both are probed).
+        private static readonly string[] ScoreManagerTypeNames =
+            { "Il2Cpp.Game_ScoreManager", "Game_ScoreManager", "Il2CppSynth.Game_ScoreManager" };
+        private static readonly string[] ScoreCandidates =
+            { "Score", "currentScore", "CurrentScore", "_score" };
+        private static readonly string[] ComboCandidates =
+            { "CurrentCombo", "currentCombo", "_currentCombo", "Combo", "_combo" };
+
+        // Duration: Game_InfoProvider directly, or via its TrackData ('AudioLenght'
+        // is the game's own typo — probe it first).
+        private static readonly string[] TrackDataCandidates =
+            { "TrackData", "_trackData", "trackData", "CurrentTrackData" };
+        private static readonly string[] DurationCandidates =
+            { "AudioLenght", "AudioLength", "_audioLenght", "Length", "Duration", "_length", "duration" };
+
+        // Play position within the song (member name unverified — candidates + debug
+        // dump; used only to resync the countdown, so a miss degrades gracefully).
+        private static readonly string[] PlayTimeCandidates =
+            { "PlayTime", "CurrentPlayTime", "playTime", "_playTime", "PlayTimeMS", "SongTime", "CurrentTrackTime" };
+
+        private static Type _scoreManagerType;
+        private static bool _scoreTypeProbed;
+        private static bool _scoreMembersDumped;
+
+        /// <summary>Read live score and combo. False if the score manager isn't up.</summary>
+        public static bool TryReadScore(out long score, out int combo)
+        {
+            score = 0; combo = 0;
+            try
+            {
+                if (!_scoreTypeProbed)
+                {
+                    _scoreTypeProbed = true;
+                    _scoreManagerType = ResolveType(ScoreManagerTypeNames);
+                    if (_scoreManagerType == null)
+                        MelonLogger.Warning("[GameHooks] Game_ScoreManager type not found; live score unavailable.");
+                }
+                if (_scoreManagerType == null) return false;
+
+                object mgr = GetSingleton(_scoreManagerType);
+                if (mgr == null) return false;
+
+                double? s = ReadNumericMember(mgr, ScoreCandidates);
+                if (s == null)
+                {
+                    if (_debug && !_scoreMembersDumped)
+                    {
+                        _scoreMembersDumped = true;
+                        DumpMembers(_scoreManagerType);
+                    }
+                    return false;
+                }
+
+                score = (long)s.Value;
+                combo = (int)(ReadNumericMember(mgr, ComboCandidates) ?? 0);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Song duration in seconds, with a seconds/ms unit heuristic.</summary>
+        public static bool TryReadDurationSeconds(out float seconds)
+        {
+            seconds = 0f;
+            try
+            {
+                if (_infoProviderType == null) return false;
+                object info = GetSingleton(_infoProviderType);
+                if (info == null) return false;
+
+                double? raw = ReadNumericMember(info, DurationCandidates);
+                if (raw == null)
+                {
+                    // Try via the TrackData object.
+                    object trackData = ReadObjectMember(info, TrackDataCandidates);
+                    if (trackData != null)
+                        raw = ReadNumericMember(trackData, DurationCandidates);
+                }
+                if (raw == null || raw.Value <= 0) return false;
+
+                double v = raw.Value;
+                // Heuristic: nothing sane is a >4h song in seconds, so bigger = ms.
+                seconds = v > 3600 * 4 ? (float)(v / 1000.0) : (float)v;
+
+                if (_debug) MelonLogger.Msg($"[GameHooks] Song duration: raw={v}, interpreted={seconds:F1}s");
+                return seconds > 5f && seconds < 3600f * 4f;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Current play position in seconds. durationSeconds (when known) disambiguates
+        /// seconds vs milliseconds: a raw value far beyond the song length must be ms.
+        /// </summary>
+        public static bool TryReadPlayTimeSeconds(float durationSeconds, out float seconds)
+        {
+            seconds = 0f;
+            try
+            {
+                object src = _gcmType != null ? GetSingleton(_gcmType) : null;
+                double? raw = src != null ? ReadNumericMember(src, PlayTimeCandidates) : null;
+
+                if (raw == null && _scoreManagerType != null)
+                {
+                    object mgr = GetSingleton(_scoreManagerType);
+                    if (mgr != null) raw = ReadNumericMember(mgr, PlayTimeCandidates);
+                }
+                if (raw == null || raw.Value < 0) return false;
+
+                double v = raw.Value;
+                if (durationSeconds > 0 && v > durationSeconds * 2) v /= 1000.0; // must be ms
+                else if (v > 3600 * 4) v /= 1000.0;
+
+                seconds = (float)v;
+                return true;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Read the first numeric-convertible member from a candidate list.</summary>
+        private static double? ReadNumericMember(object instance, string[] candidates)
+        {
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+            var type = instance.GetType();
+
+            foreach (string name in candidates)
+            {
+                try
+                {
+                    object v = null;
+                    var prop = type.GetProperty(name, flags);
+                    if (prop != null && prop.CanRead) v = prop.GetValue(instance);
+                    if (v == null)
+                    {
+                        var field = type.GetField(name, flags);
+                        if (field != null) v = field.GetValue(instance);
+                    }
+                    if (v is int || v is long || v is float || v is double || v is short || v is uint)
+                        return Convert.ToDouble(v);
+                }
+                catch { /* try next candidate */ }
+            }
+            return null;
+        }
+
+        /// <summary>Read the first non-null object member from a candidate list.</summary>
+        private static object ReadObjectMember(object instance, string[] candidates)
+        {
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+            var type = instance.GetType();
+
+            foreach (string name in candidates)
+            {
+                try
+                {
+                    var prop = type.GetProperty(name, flags);
+                    if (prop != null && prop.CanRead)
+                    {
+                        object v = prop.GetValue(instance);
+                        if (v != null) return v;
+                    }
+                    var field = type.GetField(name, flags);
+                    if (field != null)
+                    {
+                        object v = field.GetValue(instance);
+                        if (v != null) return v;
+                    }
+                }
+                catch { /* try next candidate */ }
+            }
+            return null;
         }
 
         // ------------------------------------------------------------------

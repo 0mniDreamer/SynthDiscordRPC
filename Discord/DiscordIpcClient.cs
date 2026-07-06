@@ -15,7 +15,8 @@ namespace SynthDiscordRPC.Discord
     {
         public string Details;          // top line   (e.g. song title)
         public string State;            // second line (e.g. "by Artist [Master]")
-        public long? StartTimestampMs;  // unix ms; Discord renders "XX:XX elapsed"
+        public long? StartTimestampMs;  // unix ms; with no end set, Discord renders "elapsed"
+        public long? EndTimestampMs;    // unix ms; when set, Discord renders a live countdown
         public string LargeImageKey;    // asset key OR a public https:// URL (e.g. cover art)
         public string LargeText;        // hover text on the large image
         public string SmallImageKey;    // corner overlay (e.g. game logo when cover art is shown)
@@ -349,10 +350,18 @@ namespace SynthDiscordRPC.Discord
                     first = false;
                 }
 
-                if (p.StartTimestampMs.HasValue)
+                if (p.StartTimestampMs.HasValue || p.EndTimestampMs.HasValue)
                 {
                     if (!first) sb.Append(',');
-                    sb.Append("\"timestamps\":{\"start\":").Append(p.StartTimestampMs.Value).Append('}');
+                    sb.Append("\"timestamps\":{");
+                    if (p.StartTimestampMs.HasValue)
+                        sb.Append("\"start\":").Append(p.StartTimestampMs.Value);
+                    if (p.EndTimestampMs.HasValue)
+                    {
+                        if (p.StartTimestampMs.HasValue) sb.Append(',');
+                        sb.Append("\"end\":").Append(p.EndTimestampMs.Value);
+                    }
+                    sb.Append('}');
                     first = false;
                 }
 
