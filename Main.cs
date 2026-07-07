@@ -22,7 +22,7 @@ namespace SynthDiscordRPC
         /// here before building a release. Application IDs are public — safe to embed.
         /// Users can still override via the ClientId config entry.
         /// </summary>
-        private const string DefaultClientId = "1523758767240642680";
+        private const string DefaultClientId = "1523841719685091539";
 
         private MelonPreferences_Category _cfg;
         private MelonPreferences_Entry<string> _clientId;
