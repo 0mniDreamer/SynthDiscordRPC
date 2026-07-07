@@ -137,3 +137,5 @@ and the log will contain a full member dump to update the candidate lists from.
 - **Song shows as "Unknown Song"** — enable `DebugLogging`, play a song, and check
   the member dump in the MelonLoader console; the metadata field names may have
   changed on that branch.
+## Acknowledgements
+   Not affiliated with or endorsed by Kluge Interactive.
