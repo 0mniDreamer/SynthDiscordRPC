@@ -12,6 +12,8 @@ references no Unity or game assemblies — all game access is runtime reflection
 Discord side talks the local IPC protocol directly over a named pipe (no Discord Game SDK,
 no native DLLs, no internet access, no account credentials).
 
+<img width="472" height="198" alt="image" src="https://github.com/user-attachments/assets/342db560-2a23-497c-a434-a5ef3d7f2c24" />
+
 ---
 
 ## Installing (end users)
