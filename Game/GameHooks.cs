@@ -12,20 +12,20 @@ namespace SynthDiscordRPC.Game
         public string Difficulty = "";
     }
 
-    /// <summary>
+  
     /// Hooks the game entirely via reflection (per-assembly exact type lookup + candidate
     /// member names) so no game/Unity assemblies are referenced — the same DLL runs
     /// on the Unity 2021.3.45f2 branch and the Unity 6000.3.13 branch.
-    ///
+
     /// Patch points (verified in prior SynthRidersWebsocketMod work):
     ///   GameControlManager.Awake                 -> song scene loading (postfix)
     ///   GameControlManager.OnLevelFinishedLoading -> song metadata is populated by
     ///       SetSongStatusData() around here; the reliable point to read it (postfix)
     ///   GameControlManager.ReturnToMenu          -> song end / back to menu (prefix)
-    ///
+
     /// Metadata source: Game_InfoProvider singleton, probed with the same candidate
     /// member-name sets the websocket mod uses across both branches.
-    /// </summary>
+
     public static class GameHooks
     {
         public static event Action<SongInfo> SongStarted;
@@ -75,10 +75,10 @@ namespace SynthDiscordRPC.Game
 
         public static void Configure(bool debugLogging) => _debug = debugLogging;
 
-        /// <summary>
+       
         /// Attempt to install patches. Returns false if GameControlManager isn't
         /// resolvable yet (caller retries from OnUpdate).
-        /// </summary>
+   
         public static bool TryPatch(HarmonyLib.Harmony harmony)
         {
             Type gcm = ResolveType(GcmTypeNames);
@@ -188,7 +188,7 @@ namespace SynthDiscordRPC.Game
             }
         }
 
-        /// <summary>Called every frame from Main.OnUpdate for the deferred metadata retry.</summary>
+        /// Called every frame from Main.OnUpdate for the deferred metadata retry.
         public static void Update()
         {
             if (!_pendingInfoRead) return;
@@ -220,7 +220,7 @@ namespace SynthDiscordRPC.Game
         // Metadata reading
         // ------------------------------------------------------------------
 
-        /// <summary>Returns true if metadata was available and SongStarted fired.</summary>
+        /// Returns true if metadata was available and SongStarted fired.
         private static bool TryFireSongStart()
         {
             var info = ReadSongInfo();
@@ -291,7 +291,7 @@ namespace SynthDiscordRPC.Game
         private static bool _scoreTypeProbed;
         private static bool _scoreMembersDumped;
 
-        /// <summary>Read live score and combo. False if the score manager isn't up.</summary>
+        /// Read live score and combo. False if the score manager isn't up.
         public static bool TryReadScore(out long score, out int combo)
         {
             score = 0; combo = 0;
@@ -327,7 +327,7 @@ namespace SynthDiscordRPC.Game
             catch { return false; }
         }
 
-        /// <summary>Song duration in seconds, with a seconds/ms unit heuristic.</summary>
+        /// Song duration in seconds, with a seconds/ms unit heuristic.
         public static bool TryReadDurationSeconds(out float seconds)
         {
             seconds = 0f;
@@ -357,10 +357,9 @@ namespace SynthDiscordRPC.Game
             catch { return false; }
         }
 
-        /// <summary>
         /// Current play position in seconds. durationSeconds (when known) disambiguates
         /// seconds vs milliseconds: a raw value far beyond the song length must be ms.
-        /// </summary>
+
         public static bool TryReadPlayTimeSeconds(float durationSeconds, out float seconds)
         {
             seconds = 0f;
@@ -386,7 +385,7 @@ namespace SynthDiscordRPC.Game
             catch { return false; }
         }
 
-        /// <summary>Read the first numeric-convertible member from a candidate list.</summary>
+        /// Read the first numeric-convertible member from a candidate list.
         private static double? ReadNumericMember(object instance, string[] candidates)
         {
             const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -412,7 +411,7 @@ namespace SynthDiscordRPC.Game
             return null;
         }
 
-        /// <summary>Read the first non-null object member from a candidate list.</summary>
+        /// Read the first non-null object member from a candidate list.
         private static object ReadObjectMember(object instance, string[] candidates)
         {
             const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -494,7 +493,7 @@ namespace SynthDiscordRPC.Game
             }
         }
 
-        /// <summary>Robust IL2CPP singleton lookup — probes common names as property AND field.</summary>
+        /// Robust IL2CPP singleton lookup — probes common names as property AND field.
         private static object GetSingleton(Type type)
         {
             const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
@@ -521,11 +520,11 @@ namespace SynthDiscordRPC.Game
             return null;
         }
 
-        /// <summary>
+    
         /// Read the first non-empty string-convertible member from a candidate list.
         /// IL2CPP interop exposes native fields as properties, so probe properties first,
-        /// then plain fields.
-        /// </summary>
+        /// then the plain fields.
+
         private static string ReadStringMember(object instance, string[] candidates)
         {
             const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
