@@ -9,19 +9,18 @@ using SynthDiscordRPC.Game;
 
 namespace SynthDiscordRPC
 {
-    /// <summary>
     /// Discord Rich Presence for Synth Riders.
     /// Shows the current song (title / artist / difficulty / elapsed time) on your
     /// Discord profile while playing, and an idle presence while browsing menus.
-    /// </summary>
+   
     public class Main : MelonMod
     {
-        /// <summary>
+      
         /// Distribution default: create ONE Discord application (named "Synth Riders")
         /// on https://discord.com/developers/applications and paste its Application ID
         /// here before building a release. Application IDs are public — safe to embed.
         /// Users can still override via the ClientId config entry.
-        /// </summary>
+      
         private const string DefaultClientId = "1523841719685091539";
 
         private MelonPreferences_Category _cfg;
@@ -219,10 +218,10 @@ namespace SynthDiscordRPC
             SetMenuPresence();
         }
 
-        /// <summary>
+    
         /// Periodic live-score tick, called from OnUpdate. Cheap: two DateTime compares
         /// per frame; actual reflection reads happen at most once per interval.
-        /// </summary>
+
         private void LiveStatsTick()
         {
             if (!_inSongPresence || !_liveScore.Value || _client == null) return;
@@ -241,7 +240,7 @@ namespace SynthDiscordRPC
             ComposeAndSendSongPresence();
         }
 
-        /// <summary>Compose base presence + score suffix + resynced countdown, and send.</summary>
+        /// Compose base presence + score suffix + resynced countdown, and send.
         private void ComposeAndSendSongPresence()
         {
             var baseP = _songBase;
