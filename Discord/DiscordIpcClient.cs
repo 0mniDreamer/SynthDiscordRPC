@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 
 namespace SynthDiscordRPC.Discord
 {
-    /// <summary>
+    
     /// The presence we want Discord to show. Null fields are omitted from the payload.
-    /// </summary>
+   
     public sealed class PresenceData
     {
         public string Details;          // top line   (e.g. song title)
@@ -25,11 +25,11 @@ namespace SynthDiscordRPC.Discord
         public PresenceData Clone() => (PresenceData)MemberwiseClone();
     }
 
-    /// <summary>
+  
     /// Minimal Discord Rich Presence client speaking the local IPC protocol directly
     /// over a named pipe (discord-ipc-0 .. discord-ipc-9). No Discord Game SDK, no
     /// native DLLs, no game/Unity references — pure .NET 6 BCL.
-    ///
+  
     /// Threading model:
     ///   - SetPresence()/ClearPresence() may be called from ANY thread (they only
     ///     touch a lock-guarded "desired state" slot and signal the worker).
@@ -37,7 +37,7 @@ namespace SynthDiscordRPC.Discord
     ///   - A reader task drains Discord's responses and answers PINGs.
     ///   - Pipe death (Discord closed/restarted) => automatic reconnect with backoff,
     ///     and the current desired presence is re-sent on reconnect.
-    /// </summary>
+
     public sealed class DiscordIpcClient : IDisposable
     {
         // Frame opcodes (Discord IPC protocol)
@@ -92,7 +92,7 @@ namespace SynthDiscordRPC.Discord
             _worker.Start();
         }
 
-        /// <summary>Request a presence update. Thread-safe; last write wins.</summary>
+        /// Request a presence update. Thread-safe; last write wins.
         public void SetPresence(PresenceData presence)
         {
             lock (_stateLock)
@@ -103,7 +103,7 @@ namespace SynthDiscordRPC.Discord
             _signal.Set();
         }
 
-        /// <summary>Request the presence be cleared. Thread-safe.</summary>
+        /// Request the presence be cleared. Thread-safe.
         public void ClearPresence() => SetPresence(null);
 
         // ------------------------------------------------------------------
@@ -191,7 +191,7 @@ namespace SynthDiscordRPC.Discord
             IsConnected = false;
         }
 
-        /// <summary>Sliding-window rate check; only called from the worker thread.</summary>
+        /// Sliding-window rate check; only called from the worker thread.
         private bool CanWriteNow()
         {
             long now = Environment.TickCount64;
@@ -398,10 +398,10 @@ namespace SynthDiscordRPC.Discord
             return sb.ToString();
         }
 
-        /// <summary>
+    
         /// Discord requires string fields to be 2..128 chars.
         /// Returns null (omit field) for empty; pads 1-char strings; truncates long ones.
-        /// </summary>
+     
         private static string Sanitize(string s)
         {
             if (string.IsNullOrWhiteSpace(s)) return null;
