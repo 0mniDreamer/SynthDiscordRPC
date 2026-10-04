@@ -8,11 +8,11 @@ using MelonLoader;
 
 namespace SynthDiscordRPC.CoverArt
 {
-    /// <summary>
+  
     /// Resolves album/cover art URLs for custom songs via the synthriderz.com API,
     /// so Discord can display per-song art (Discord requires a public URL — it cannot
     /// show local images, and custom song covers live inside local .synth files).
-    ///
+
     /// Probe-first notes:
     ///  - The API base (https://synthriderz.com/api/beatmaps) is confirmed in use by
     ///    community tooling. The exact search syntax and cover field name are best
@@ -20,14 +20,14 @@ namespace SynthDiscordRPC.CoverArt
     ///    (same discipline as game-member candidates) and, with DebugLogging on,
     ///    dumps the real JSON keys of the first item it sees.
     ///  - Verify/adjust with:  curl "https://synthriderz.com/api/beatmaps?limit=1"
-    ///
+
     /// All I/O is on background threads (HttpClient + Task), mirroring the
     /// download-on-background / marshal-nothing pattern: the completion callback only
     /// calls DiscordIpcClient.SetPresence, which is thread-safe by design.
-    ///
+
     /// OST songs are not on synthriderz — lookups miss and the caller keeps the
     /// default logo. Misses are cached too, so each song costs at most one query.
-    /// </summary>
+ 
     public sealed class CoverArtResolver
     {
         private const string ApiBase = "https://synthriderz.com";
@@ -76,12 +76,11 @@ namespace SynthDiscordRPC.CoverArt
             catch { return Path.Combine(Directory.GetCurrentDirectory(), "UserData"); }
         }
 
-        /// <summary>
         /// Resolve a cover URL for (title, artist) on a background thread.
         /// Invokes onResolved exactly once with the URL, or null if unavailable.
         /// onResolved may run on a threadpool thread — callers must only do
         /// thread-safe work in it (DiscordIpcClient.SetPresence is fine).
-        /// </summary>
+
         public void ResolveAsync(string title, string artist, Action<string> onResolved)
         {
             if (string.IsNullOrWhiteSpace(title))
@@ -170,12 +169,12 @@ namespace SynthDiscordRPC.CoverArt
             return null;
         }
 
-        /// <summary>
+      
         /// iTunes Search API lookup. Response shape: {"resultCount":N,"results":[...]}
         /// with "artworkUrl100" and "artistName" per result. We take the first result
         /// whose artist actually matches ours, and upscale the artwork URL
         /// (100x100 -> 512x512; Apple serves arbitrary sizes on the same path).
-        /// </summary>
+
         private async Task<string> QueryITunes(string title, string artist)
         {
             string term = Uri.EscapeDataString($"{artist.Trim()} {title.Trim()}");
@@ -214,7 +213,7 @@ namespace SynthDiscordRPC.CoverArt
             return null;
         }
 
-        /// <summary>Lowercase, alphanumerics only — tolerant artist comparison.</summary>
+        ///Lowercase, alphanumerics only — tolerant artist comparison.
         private static string NormalizeForMatch(string s)
         {
             if (string.IsNullOrEmpty(s)) return "";
@@ -225,7 +224,7 @@ namespace SynthDiscordRPC.CoverArt
             return sb.ToString();
         }
 
-        /// <summary>Handle both response shapes: a raw JSON array, or {"data":[...]}.</summary>
+        /// Handle both response shapes: a raw JSON array, or {"data":[...]}.
         private static JsonElement FindFirstItem(JsonElement root)
         {
             if (root.ValueKind == JsonValueKind.Array)
